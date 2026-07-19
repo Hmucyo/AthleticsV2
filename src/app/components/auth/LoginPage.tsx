@@ -2,10 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Shield, UserPlus, LogIn } from "lucide-react";
 import afspLogo from "../../../assets/afsp-logo.png";
 
-type Role = "athlete" | "coach" | "admin";
-
 interface LoginPayload {
-  role: Role;
   email: string;
   password: string;
 }
@@ -20,58 +17,73 @@ interface AthleteSignupPayload {
 interface AuthResult {
   success: boolean;
   message: string;
+  needsEmailConfirmation?: boolean;
 }
 
 interface LoginPageProps {
-  onLogin: (payload: LoginPayload) => AuthResult;
-  onAthleteSignUp: (payload: AthleteSignupPayload) => AuthResult;
+  onLogin: (payload: LoginPayload) => AuthResult | Promise<AuthResult>;
+  onAthleteSignUp: (payload: AthleteSignupPayload) => AuthResult | Promise<AuthResult>;
 }
-
-const roleLabels: Record<Role, string> = {
-  athlete: "Athlete",
-  coach: "Coach",
-  admin: "Admin",
-};
 
 export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [role, setRole] = useState<Role>("athlete");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [sport, setSport] = useState("");
   const [feedback, setFeedback] = useState<AuthResult | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const clearAuthFields = () => {
     setEmail("");
     setPassword("");
   };
 
-  const handleLogin = (event: FormEvent) => {
+  const handleLogin = async (event: FormEvent) => {
     event.preventDefault();
-    const result = onLogin({
-      role,
-      email: email.trim(),
-      password,
-    });
-    setFeedback(result);
-    if (!result.success) return;
-    clearAuthFields();
+    setIsSubmitting(true);
+    setFeedback(null);
+    try {
+      const result = await onLogin({
+        email: email.trim(),
+        password,
+      });
+      setFeedback(result);
+      if (!result.success) return;
+      clearAuthFields();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSignup = (event: FormEvent) => {
+  const handleSignup = async (event: FormEvent) => {
     event.preventDefault();
-    const result = onAthleteSignUp({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-      sport: sport.trim(),
-    });
-    setFeedback(result);
-    if (!result.success) return;
-    setName("");
-    setSport("");
-    clearAuthFields();
+    setIsSubmitting(true);
+    setFeedback(null);
+    try {
+      const result = await onAthleteSignUp({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        sport: sport.trim(),
+      });
+      setFeedback(result);
+      if (!result.success) return;
+
+      if (result.needsEmailConfirmation) {
+        setMode("login");
+        setName("");
+        setSport("");
+        setPassword("");
+        return;
+      }
+
+      setName("");
+      setSport("");
+      clearAuthFields();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,7 +108,7 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
             <span className="text-primary">Access Portal</span>
           </h1>
           <p className="text-muted-foreground mt-2" style={{ fontFamily: "var(--font-body)", fontSize: "0.82rem" }}>
-            Athletes can sign up here. Coach and admin accounts are provisioned by administration.
+            Sign in with your email. Athletes can create an account here. Coach and admin accounts are provisioned by administration.
           </p>
         </div>
 
@@ -119,7 +131,6 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
             type="button"
             onClick={() => {
               setMode("signup");
-              setRole("athlete");
               setFeedback(null);
             }}
             className={`py-2 border uppercase transition-all cursor-pointer ${
@@ -134,26 +145,6 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
 
         {mode === "login" ? (
           <form className="space-y-4" onSubmit={handleLogin}>
-            <div>
-              <label className="block text-muted-foreground uppercase mb-2" style={{ fontFamily: "var(--font-mono)", fontSize: "0.58rem", letterSpacing: "0.1em" }}>
-                Role
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(roleLabels) as Role[]).map((targetRole) => (
-                  <button
-                    key={targetRole}
-                    type="button"
-                    onClick={() => setRole(targetRole)}
-                    className={`py-2 border uppercase transition-all cursor-pointer ${
-                      role === targetRole ? "bg-primary border-primary text-white" : "border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                    style={{ fontFamily: "var(--font-display)", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em" }}
-                  >
-                    {roleLabels[targetRole]}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div>
               <label className="block text-muted-foreground uppercase mb-1" style={{ fontFamily: "var(--font-mono)", fontSize: "0.58rem", letterSpacing: "0.1em" }}>
                 Email
@@ -182,10 +173,11 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase"
+              disabled={isSubmitting}
+              className="w-full py-2.5 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase disabled:opacity-60"
               style={{ fontFamily: "var(--font-display)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em" }}
             >
-              Continue as {roleLabels[role]}
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
         ) : (
@@ -245,17 +237,22 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase"
+              disabled={isSubmitting}
+              className="w-full py-2.5 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase disabled:opacity-60"
               style={{ fontFamily: "var(--font-display)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em" }}
             >
-              Create Athlete Account
+              {isSubmitting ? "Creating account..." : "Create Athlete Account"}
             </button>
           </form>
         )}
 
         {feedback && (
           <div
-            className={`border px-3 py-2 ${feedback.success ? "border-[#4ade80]/30 text-[#4ade80] bg-[#4ade80]/10" : "border-destructive/30 text-destructive bg-destructive/10"}`}
+            className={`border px-3 py-2 ${
+              feedback.success
+                ? "border-[#4ade80]/30 text-[#4ade80] bg-[#4ade80]/10"
+                : "border-destructive/30 text-destructive bg-destructive/10"
+            }`}
             style={{ fontFamily: "var(--font-body)", fontSize: "0.78rem" }}
           >
             <Shield size={14} className="inline mr-1.5 -mt-0.5" />

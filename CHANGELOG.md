@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-18
+
+- Replaced mock in-memory auth with Supabase Auth (email/password) and persisted sessions.
+- Added Supabase Postgres tables for profiles, athletes, and journal entries with Row Level Security.
+- Wired login, athlete signup, coach provisioning, athlete profiles, and journal CRUD to the database.
+- Added setup/seed scripts for schema application and the original demo users (admin, coach, athlete).
+- Switched Tailwind from the hanging Vite plugin to PostCSS so local `dev`/`build` can start.
+- Wired athlete Profile to the signed-in user with persistent saves; improved signup/confirm and role-free login.
+- Journal media now uploads to Supabase Storage; mock programs/messages/dashboard clearly labeled as demo.
+
 ## 2026-06-12
 
 - Added a role-based authentication entry flow with athlete self-signup and role-specific sign-in.

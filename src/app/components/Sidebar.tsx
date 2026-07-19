@@ -42,7 +42,7 @@ interface SidebarProps {
   role: Role;
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   currentUserName: string;
 }
 

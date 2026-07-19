@@ -116,7 +116,11 @@ export function Messaging() {
   });
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="border-b border-[#ff8c42]/40 bg-[#ff8c42]/10 px-4 py-2 text-[#ff8c42]" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
+        Messaging is demo UI for now. Conversations are not saved to the database yet.
+      </div>
+      <div className="flex-1 flex overflow-hidden">
       {/* Sidebar */}
       <div className="w-72 flex-shrink-0 border-r border-border flex flex-col bg-card">
         <div className="p-4 border-b border-border">
@@ -255,6 +259,7 @@ export function Messaging() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

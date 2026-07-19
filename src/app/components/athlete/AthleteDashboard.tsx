@@ -24,7 +24,11 @@ const weeklyData = [
 
 const completionData = [{ name: 'Progress', value: 67, fill: '#ff5500' }, { name: 'Remaining', value: 33, fill: '#1e2225' }];
 
-export function AthleteDashboard() {
+interface AthleteDashboardProps {
+  athleteName?: string;
+}
+
+export function AthleteDashboard({ athleteName = "Athlete" }: AthleteDashboardProps) {
   const [completed, setCompleted] = useState<Set<number>>(new Set([1, 2]));
   const [expanded, setExpanded] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'workout' | 'progress'>('workout');
@@ -36,14 +40,22 @@ export function AthleteDashboard() {
   };
 
   const pct = Math.round((completed.size / exercises.length) * 100);
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).toUpperCase();
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="border border-[#ff8c42]/40 bg-[#ff8c42]/10 px-3 py-2 text-[#ff8c42]" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
+        Welcome, {athleteName}. Today&apos;s workout card is demo content until programs are connected to your account.
+      </div>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>
-            FRIDAY · JUNE 13
+            {todayLabel}
           </div>
           <h1 className="text-foreground" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             UPPER BODY<br />

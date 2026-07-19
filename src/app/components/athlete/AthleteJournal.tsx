@@ -27,9 +27,14 @@ interface AthleteJournalProps {
   athleteEmail: string;
   athleteName: string;
   entries: JournalEntry[];
-  onCreateEntry: (payload: { athleteEmail: string; athleteName: string; text: string; media: JournalMedia[] }) => CreateJournalResult;
-  onUpdateEntry: (payload: { id: string; text: string }) => CreateJournalResult;
-  onDeleteEntry: (payload: { id: string }) => CreateJournalResult;
+  onCreateEntry: (payload: {
+    athleteEmail: string;
+    athleteName: string;
+    text: string;
+    mediaFiles: Array<{ file: File; type: JournalMedia["type"] }>;
+  }) => CreateJournalResult | Promise<CreateJournalResult>;
+  onUpdateEntry: (payload: { id: string; text: string }) => CreateJournalResult | Promise<CreateJournalResult>;
+  onDeleteEntry: (payload: { id: string }) => CreateJournalResult | Promise<CreateJournalResult>;
 }
 
 const MAX_AUDIO_SIZE_MB = 10;
@@ -42,6 +47,7 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [feedback, setFeedback] = useState<CreateJournalResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const validateFileSize = (file: File, maxMb: number) => file.size <= maxMb * 1024 * 1024;
 
@@ -86,30 +92,20 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
     setFeedback(null);
   };
 
-  const submitEntry = (event: FormEvent) => {
+  const submitEntry = async (event: FormEvent) => {
     event.preventDefault();
-    const media: JournalMedia[] = [];
+    const uploads: Array<{ file: File; type: JournalMedia["type"] }> = [];
 
     if (audioFile) {
-      media.push({
-        id: `media-${Date.now()}-audio`,
-        type: "audio",
-        name: audioFile.name,
-        url: URL.createObjectURL(audioFile),
-      });
+      uploads.push({ file: audioFile, type: "audio" });
     }
 
-    mediaFiles.forEach((file, index) => {
+    mediaFiles.forEach((file) => {
       const type = file.type.startsWith("video/") ? "video" : "image";
-      media.push({
-        id: `media-${Date.now()}-${index}`,
-        type,
-        name: file.name,
-        url: URL.createObjectURL(file),
-      });
+      uploads.push({ file, type });
     });
 
-    if (!text.trim() && media.length === 0) {
+    if (!text.trim() && uploads.length === 0) {
       setFeedback({
         success: false,
         message: "Add text or at least one media file before saving.",
@@ -117,18 +113,24 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
       return;
     }
 
-    const result = onCreateEntry({
-      athleteEmail,
-      athleteName,
-      text: text.trim(),
-      media,
-    });
+    setIsSaving(true);
+    setFeedback(null);
+    try {
+      const result = await onCreateEntry({
+        athleteEmail,
+        athleteName,
+        text: text.trim(),
+        mediaFiles: uploads,
+      });
 
-    setFeedback(result);
-    if (!result.success) return;
-    setText("");
-    setAudioFile(null);
-    setMediaFiles([]);
+      setFeedback(result);
+      if (!result.success) return;
+      setText("");
+      setAudioFile(null);
+      setMediaFiles([]);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const startEditing = (entry: JournalEntry) => {
@@ -137,13 +139,18 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
     setFeedback(null);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingEntryId) return;
-    const result = onUpdateEntry({ id: editingEntryId, text: editingText });
-    setFeedback(result);
-    if (!result.success) return;
-    setEditingEntryId(null);
-    setEditingText("");
+    setIsSaving(true);
+    try {
+      const result = await onUpdateEntry({ id: editingEntryId, text: editingText });
+      setFeedback(result);
+      if (!result.success) return;
+      setEditingEntryId(null);
+      setEditingText("");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const cancelEdit = () => {
@@ -151,8 +158,8 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
     setEditingText("");
   };
 
-  const deleteEntry = (entryId: string) => {
-    const result = onDeleteEntry({ id: entryId });
+  const deleteEntry = async (entryId: string) => {
+    const result = await onDeleteEntry({ id: entryId });
     setFeedback(result);
     if (editingEntryId === entryId) cancelEdit();
   };
@@ -214,10 +221,11 @@ export function AthleteJournal({ athleteEmail, athleteName, entries, onCreateEnt
         </div>
         <button
           type="submit"
-          className="px-4 py-2 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase inline-flex items-center gap-1.5"
+          disabled={isSaving}
+          className="px-4 py-2 bg-primary text-white hover:opacity-90 transition-opacity cursor-pointer uppercase inline-flex items-center gap-1.5 disabled:opacity-60"
           style={{ fontFamily: "var(--font-display)", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em" }}
         >
-          <Plus size={13} /> Save Entry
+          <Plus size={13} /> {isSaving ? "Saving..." : "Save Entry"}
         </button>
       </form>
 

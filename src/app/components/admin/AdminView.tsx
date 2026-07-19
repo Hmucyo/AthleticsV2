@@ -70,8 +70,12 @@ const MAX_EXERCISE_MEDIA_SIZE_MB = 25;
 
 interface AdminViewProps {
   currentPage: string;
-  onCreateCoach: (payload: { name: string; email: string; password: string }) => { success: boolean; message: string };
-  onCreateAthleteProfile: (payload: { name: string; email: string; sport: string }) => { success: boolean; message: string };
+  onCreateCoach: (payload: { name: string; email: string; password: string }) =>
+    | { success: boolean; message: string }
+    | Promise<{ success: boolean; message: string }>;
+  onCreateAthleteProfile: (payload: { name: string; email: string; sport: string }) =>
+    | { success: boolean; message: string }
+    | Promise<{ success: boolean; message: string }>;
   athletes: Array<{ id: string; name: string; email: string; sport: string; createdBy: "admin" | "self" }>;
   coaches: Array<{ id: string; name: string; email: string }>;
   journalEntries: JournalEntry[];
@@ -148,9 +152,9 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
   const toggleLock = (id: number) => setGroupList(prev => prev.map(g => g.id === id ? { ...g, locked: !g.locked } : g));
   const adminCreatedAthleteProfiles = athletes.filter((athlete) => athlete.createdBy === "admin").length;
 
-  const submitCoachCreation = (event: FormEvent) => {
+  const submitCoachCreation = async (event: FormEvent) => {
     event.preventDefault();
-    const result = onCreateCoach({
+    const result = await onCreateCoach({
       name: coachName.trim(),
       email: coachEmail.trim(),
       password: coachPassword,
@@ -162,9 +166,9 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     setCoachPassword("");
   };
 
-  const submitAthleteProfileCreation = (event: FormEvent) => {
+  const submitAthleteProfileCreation = async (event: FormEvent) => {
     event.preventDefault();
-    const result = onCreateAthleteProfile({
+    const result = await onCreateAthleteProfile({
       name: athleteName.trim(),
       email: athleteEmail.trim(),
       sport: athleteSport.trim(),

@@ -92,7 +92,11 @@ const programs = [
 
 type ModalState = 'details' | 'enroll' | 'payment' | 'success' | null;
 
-export function ProgramMarketplace() {
+interface ProgramMarketplaceProps {
+  onGoToDashboard?: () => void;
+}
+
+export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps) {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterLevel, setFilterLevel] = useState('All');
@@ -115,6 +119,9 @@ export function ProgramMarketplace() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
+      <div className="mb-4 border border-[#ff8c42]/40 bg-[#ff8c42]/10 px-3 py-2 text-[#ff8c42]" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
+        Program catalog is demo content. Enrollment does not charge cards or create live contracts yet.
+      </div>
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -340,15 +347,15 @@ export function ProgramMarketplace() {
                   </div>
                 ))}
               </div>
-              <div className="text-muted-foreground p-3 border border-border" style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', lineHeight: 1.5 }}>
-                By proceeding, you agree to the enrollment terms. A contract will be generated and sent to admin for review. Your card will be charged ${selected.price}/month.
+              <div className="text-muted-foreground p-3 border border-[#ff8c42]/40 bg-[#ff8c42]/10" style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                Demo only — payments are not processed yet. Confirming will not charge a card.
               </div>
               <button
                 onClick={() => setModal('success')}
                 className="w-full py-3 text-white hover:opacity-90 transition-opacity cursor-pointer uppercase flex items-center justify-center gap-2"
                 style={{ background: selected.color, fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.08em' }}
               >
-                <CreditCard size={16} /> Confirm & Pay ${selected.price * duration}
+                <CreditCard size={16} /> Continue Demo Enrollment
               </button>
             </div>
           </div>
@@ -362,10 +369,17 @@ export function ProgramMarketplace() {
             <div className="w-16 h-16 bg-[#4ade80]/10 border border-[#4ade80]/30 flex items-center justify-center mx-auto mb-5">
               <Check size={32} className="text-[#4ade80]" />
             </div>
-            <h2 className="text-foreground uppercase mb-2" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.4rem', letterSpacing: '0.06em' }}>Enrolled!</h2>
-            <p className="text-muted-foreground mb-1" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', lineHeight: 1.6 }}>You're now enrolled in <strong className="text-foreground">{selected.name}</strong>. A contract has been generated and sent to admin for approval.</p>
-            <p className="text-muted-foreground mb-6" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>Your training starts tomorrow.</p>
-            <button onClick={closeModal} className="px-6 py-2.5 bg-primary text-white hover:opacity-90 cursor-pointer uppercase" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.08em' }}>
+            <h2 className="text-foreground uppercase mb-2" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.4rem', letterSpacing: '0.06em' }}>Demo Enrollment Saved</h2>
+            <p className="text-muted-foreground mb-1" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', lineHeight: 1.6 }}>You previewed enrollment in <strong className="text-foreground">{selected.name}</strong>. No payment was taken.</p>
+            <p className="text-muted-foreground mb-6" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>Live billing and contracts will connect in a later release.</p>
+            <button
+              onClick={() => {
+                closeModal();
+                onGoToDashboard?.();
+              }}
+              className="px-6 py-2.5 bg-primary text-white hover:opacity-90 cursor-pointer uppercase"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.08em' }}
+            >
               Go to Dashboard
             </button>
           </div>
