@@ -116,7 +116,11 @@ export function Messaging() {
   });
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="border-b border-[#ff8c42]/40 bg-[#ff8c42]/10 px-4 py-2 text-[#ff8c42]" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
+        Messaging is demo UI for now. Conversations are not saved to the database yet.
+      </div>
+      <div className="flex-1 flex overflow-hidden">
       {/* Sidebar */}
       <div className="w-72 flex-shrink-0 border-r border-border flex flex-col bg-card">
         <div className="p-4 border-b border-border">
@@ -193,17 +197,17 @@ export function Messaging() {
 
           {/* Pending acceptance banner */}
           {current.status === 'pending' && (
-            <div className="mx-4 mt-4 p-4 border border-[#ff8c42]/30 bg-[#ff8c42]/5 flex items-center justify-between">
-              <div>
+            <div className="mx-4 mt-4 p-4 border border-[#ff8c42]/30 bg-[#ff8c42]/5 flex flex-col gap-3">
+              <div className="min-w-0">
                 <div className="text-foreground uppercase mb-0.5" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.04em' }}>Message Request</div>
-                <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>{current.name} wants to connect. Accept to enable replies.</div>
+                <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem', lineHeight: 1.5 }}>{current.name} wants to connect. Accept to enable replies.</div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => acceptRequest(current.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4ade80]/10 border border-[#4ade80]/30 text-[#4ade80] hover:bg-[#4ade80]/20 transition-all cursor-pointer" style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                  <Check size={13} /> Accept
+              <div className="flex flex-wrap gap-2 pt-1 border-t border-[#ff8c42]/20">
+                <button onClick={() => acceptRequest(current.id)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#4ade80]/10 border border-[#4ade80]/30 text-[#4ade80] hover:bg-[#4ade80]/20 transition-all cursor-pointer whitespace-nowrap" style={{ fontFamily: 'var(--font-display)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  <Check size={12} /> Accept
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 transition-all cursor-pointer" style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                  <X size={13} /> Decline
+                <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 transition-all cursor-pointer whitespace-nowrap" style={{ fontFamily: 'var(--font-display)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  <X size={12} /> Decline
                 </button>
               </div>
             </div>
@@ -255,6 +259,7 @@ export function Messaging() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
