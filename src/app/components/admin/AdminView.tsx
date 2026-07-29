@@ -1,8 +1,13 @@
 // IMPORTANT: Before modifying this file, please update CHANGELOG.md with a summary of your changes.
-import { useState, type FormEvent, type ChangeEvent } from "react";
+import { useMemo, useState, type FormEvent, type ChangeEvent } from "react";
 import { FileText, Download, Check, X, Eye, Clock, Users, Lock, Unlock, ChevronDown, ChevronUp, AlertCircle, ShieldCheck } from "lucide-react";
+import { DayPicker } from "react-day-picker";
 import { AdminMessaging } from "./AdminMessaging";
 import type { JournalEntry } from "../athlete/AthleteJournal";
+import type { AthleteExerciseAssignment, ExerciseItem, ProgramItem } from "../../../lib/training";
+import { toDateKey } from "../../../lib/training";
+import type { Conversation, MessagingUser } from "../../../lib/messaging";
+import "react-day-picker/dist/style.css";
 
 const contracts = [
   { id: 'C-2024-0089', athlete: 'Jordan Cole', program: 'Elite Strength', coach: 'Marcus Webb', amount: '$149/mo', duration: '3 months', signed: 'Jun 12, 2025', status: 'Pending', type: 'Virtual' },
@@ -56,16 +61,6 @@ const groups = [
   { id: 5, name: 'Coaches Channel', type: 'Internal', members: 6, coach: 'Admin', locked: true },
 ];
 
-interface ExerciseItem {
-  id: string;
-  name: string;
-  description: string;
-  mediaUrl: string;
-  mediaType: "image" | "video";
-  mediaName: string;
-  videoLink?: string;
-}
-
 const MAX_EXERCISE_MEDIA_SIZE_MB = 25;
 
 interface AdminViewProps {
@@ -79,9 +74,36 @@ interface AdminViewProps {
   athletes: Array<{ id: string; name: string; email: string; sport: string; createdBy: "admin" | "self" }>;
   coaches: Array<{ id: string; name: string; email: string }>;
   journalEntries: JournalEntry[];
+  exerciseList: ExerciseItem[];
+  programList: ProgramItem[];
+  assignments: AthleteExerciseAssignment[];
+  onExercisesChange: (exercises: ExerciseItem[]) => void;
+  onProgramsChange: (programs: ProgramItem[]) => void;
+  onAssignmentsChange: (assignments: AthleteExerciseAssignment[]) => void;
+  currentUser: MessagingUser;
+  conversations: Conversation[];
+  onConversationsChange: (updater: Conversation[] | ((previous: Conversation[]) => Conversation[])) => void;
+  messagingDirectory: MessagingUser[];
 }
 
-export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, athletes, coaches, journalEntries }: AdminViewProps) {
+export function AdminView({
+  currentPage,
+  onCreateCoach,
+  onCreateAthleteProfile,
+  athletes,
+  coaches,
+  journalEntries,
+  exerciseList,
+  programList,
+  assignments,
+  onExercisesChange,
+  onProgramsChange,
+  onAssignmentsChange,
+  currentUser,
+  conversations,
+  onConversationsChange,
+  messagingDirectory,
+}: AdminViewProps) {
   const [contractList, setContractList] = useState(contracts);
   const [requestList, setRequestList] = useState(customRequests);
   const [groupList, setGroupList] = useState(groups);
@@ -96,53 +118,18 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
   const [newExerciseDescription, setNewExerciseDescription] = useState("");
   const [newExerciseVideoLink, setNewExerciseVideoLink] = useState("");
   const [newExerciseMediaFile, setNewExerciseMediaFile] = useState<File | null>(null);
+  const [newExerciseRequiresWeights, setNewExerciseRequiresWeights] = useState(false);
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [showExerciseForm, setShowExerciseForm] = useState(false);
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
   const [athleteSearch, setAthleteSearch] = useState("");
   const [selectedAthleteEmail, setSelectedAthleteEmail] = useState<string | null>(null);
   const [newProgram, setNewProgram] = useState("");
-  const [exerciseList, setExerciseList] = useState<ExerciseItem[]>([
-    {
-      id: "exercise-001",
-      name: "Barbell Squat",
-      description: "Stand with shoulder-width stance, brace core, descend to parallel, and drive up.",
-      mediaUrl: "https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      mediaName: "barbell-squat-demo.jpg",
-      videoLink: "https://www.youtube.com/watch?v=bEv6CCg2BC8",
-    },
-    {
-      id: "exercise-002",
-      name: "Romanian Deadlift",
-      description: "Hinge from the hips, keep neutral spine, and lower bar until hamstrings are loaded.",
-      mediaUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-      mediaType: "video",
-      mediaName: "romanian-deadlift-demo.mp4",
-      videoLink: "https://www.youtube.com/watch?v=2SHsk9AzdjA",
-    },
-    {
-      id: "exercise-003",
-      name: "Incline DB Press",
-      description: "Press dumbbells up from a 30-degree bench while controlling the descent.",
-      mediaUrl: "https://images.unsplash.com/photo-1534258936925-c58bed479fcb?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      mediaName: "incline-dumbbell-press.jpg",
-    },
-    {
-      id: "exercise-004",
-      name: "Sprint Mechanics Drills",
-      description: "A-skip and wall drill sequence to improve knee drive and sprint posture.",
-      mediaUrl: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=800&q=80",
-      mediaType: "image",
-      mediaName: "sprint-mechanics.jpg",
-    },
-  ]);
-  const [programList, setProgramList] = useState<string[]>([
-    "Elite Strength",
-    "Recovery & Mobility",
-    "Sprint Mechanics",
-  ]);
+  const [showAssignPanel, setShowAssignPanel] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<"program" | "athlete">("program");
+  const [assignProgramId, setAssignProgramId] = useState("");
+  const [assignAthleteEmail, setAssignAthleteEmail] = useState("");
+  const [assignDate, setAssignDate] = useState<Date>(() => new Date());
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   const approveContract = (id: string) => setContractList(prev => prev.map(c => c.id === id ? { ...c, status: 'Approved' } : c));
@@ -202,8 +189,8 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     }
 
     if (editingExerciseId) {
-      setExerciseList((previous) =>
-        previous.map((item) => {
+      onExercisesChange(
+        exerciseList.map((item) => {
           if (item.id !== editingExerciseId) return item;
           if (!newExerciseMediaFile) {
             return {
@@ -211,6 +198,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
               name,
               description,
               videoLink: newExerciseVideoLink.trim() || undefined,
+              requiresWeights: newExerciseRequiresWeights,
             };
           }
           return {
@@ -221,6 +209,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
             mediaType: newExerciseMediaFile.type.startsWith("video/") ? "video" : "image",
             mediaName: newExerciseMediaFile.name,
             videoLink: newExerciseVideoLink.trim() || undefined,
+            requiresWeights: newExerciseRequiresWeights,
           };
         })
       );
@@ -236,8 +225,9 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
         mediaType,
         mediaName: newExerciseMediaFile!.name,
         videoLink: newExerciseVideoLink.trim() || undefined,
+        requiresWeights: newExerciseRequiresWeights,
       };
-      setExerciseList((previous) => [createdExercise, ...previous]);
+      onExercisesChange([createdExercise, ...exerciseList]);
       setSelectedExerciseId(createdExercise.id);
       setFeedback({ success: true, message: `Exercise added: ${name}.` });
     }
@@ -246,6 +236,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     setNewExerciseDescription("");
     setNewExerciseVideoLink("");
     setNewExerciseMediaFile(null);
+    setNewExerciseRequiresWeights(false);
     setEditingExerciseId(null);
     setShowExerciseForm(false);
   };
@@ -254,11 +245,14 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     event.preventDefault();
     const label = newProgram.trim();
     if (!label) return;
-    if (programList.some((item) => item.toLowerCase() === label.toLowerCase())) {
+    if (programList.some((item) => item.name.toLowerCase() === label.toLowerCase())) {
       setFeedback({ success: false, message: "Program already exists." });
       return;
     }
-    setProgramList((previous) => [...previous, label]);
+    onProgramsChange([
+      ...programList,
+      { id: `program-${Date.now()}`, name: label, exerciseIds: [] },
+    ]);
     setNewProgram("");
     setFeedback({ success: true, message: `Program added: ${label}.` });
   };
@@ -303,6 +297,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     setNewExerciseDescription("");
     setNewExerciseVideoLink("");
     setNewExerciseMediaFile(null);
+    setNewExerciseRequiresWeights(false);
     setShowExerciseForm(true);
   };
 
@@ -312,6 +307,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     setNewExerciseDescription(exercise.description);
     setNewExerciseVideoLink(exercise.videoLink ?? "");
     setNewExerciseMediaFile(null);
+    setNewExerciseRequiresWeights(Boolean(exercise.requiresWeights));
     setShowExerciseForm(true);
   };
 
@@ -322,25 +318,124 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
     setNewExerciseDescription("");
     setNewExerciseVideoLink("");
     setNewExerciseMediaFile(null);
+    setNewExerciseRequiresWeights(false);
   };
 
   const deleteExercise = (exerciseId: string) => {
-    setExerciseList((previous) => previous.filter((item) => item.id !== exerciseId));
+    onExercisesChange(exerciseList.filter((item) => item.id !== exerciseId));
+    onProgramsChange(
+      programList.map((program) => ({
+        ...program,
+        exerciseIds: program.exerciseIds.filter((id) => id !== exerciseId),
+      }))
+    );
+    onAssignmentsChange(assignments.filter((item) => item.exerciseId !== exerciseId));
     if (selectedExerciseId === exerciseId) setSelectedExerciseId(null);
     if (editingExerciseId === exerciseId) cancelExerciseForm();
     setFeedback({ success: true, message: "Exercise deleted." });
   };
 
+  const openAssignPanel = () => {
+    setShowAssignPanel(true);
+    setAssignTarget("program");
+    setAssignProgramId(programList[0]?.id ?? "");
+    setAssignAthleteEmail(athletes[0]?.email ?? "");
+    setAssignDate(new Date());
+    setFeedback(null);
+  };
+
+  const submitAssignment = () => {
+    if (!selectedExercise) {
+      setFeedback({ success: false, message: "Select an exercise first." });
+      return;
+    }
+
+    if (assignTarget === "program") {
+      const program = programList.find((item) => item.id === assignProgramId);
+      if (!program) {
+        setFeedback({ success: false, message: "Choose a program." });
+        return;
+      }
+      if (program.exerciseIds.includes(selectedExercise.id)) {
+        setFeedback({ success: false, message: `${selectedExercise.name} is already in ${program.name}.` });
+        return;
+      }
+      onProgramsChange(
+        programList.map((item) =>
+          item.id === program.id
+            ? { ...item, exerciseIds: [...item.exerciseIds, selectedExercise.id] }
+            : item
+        )
+      );
+      setFeedback({ success: true, message: `Assigned ${selectedExercise.name} to program ${program.name}.` });
+      setShowAssignPanel(false);
+      return;
+    }
+
+    const athlete = athletes.find((item) => item.email === assignAthleteEmail);
+    if (!athlete) {
+      setFeedback({ success: false, message: "Choose an athlete." });
+      return;
+    }
+    const dateKey = toDateKey(assignDate);
+    const alreadyAssigned = assignments.some(
+      (item) =>
+        item.exerciseId === selectedExercise.id &&
+        item.athleteEmail.toLowerCase() === athlete.email.toLowerCase() &&
+        item.scheduledDate === dateKey
+    );
+    if (alreadyAssigned) {
+      setFeedback({
+        success: false,
+        message: `${selectedExercise.name} is already assigned to ${athlete.name} on ${dateKey}.`,
+      });
+      return;
+    }
+
+    const assignment: AthleteExerciseAssignment = {
+      id: `assign-${Date.now()}`,
+      athleteEmail: athlete.email,
+      athleteName: athlete.name,
+      exerciseId: selectedExercise.id,
+      scheduledDate: dateKey,
+      completed: false,
+      assignedAt: new Date().toISOString(),
+    };
+    onAssignmentsChange([assignment, ...assignments]);
+    setFeedback({
+      success: true,
+      message: `Assigned ${selectedExercise.name} to ${athlete.name} on ${dateKey}.`,
+    });
+    setShowAssignPanel(false);
+  };
+
+  const removeExerciseFromProgram = (programId: string, exerciseId: string) => {
+    onProgramsChange(
+      programList.map((program) =>
+        program.id === programId
+          ? { ...program, exerciseIds: program.exerciseIds.filter((id) => id !== exerciseId) }
+          : program
+      )
+    );
+    setFeedback({ success: true, message: "Exercise removed from program." });
+  };
+
+  const exerciseNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    exerciseList.forEach((exercise) => map.set(exercise.id, exercise.name));
+    return map;
+  }, [exerciseList]);
+
   if (currentPage === 'admin-dashboard') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>ADMINISTRATION</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
             ADMIN<br /><span className="text-[#a78bfa]">OVERVIEW</span>
           </h1>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Pending Contracts', value: contractList.filter(c => c.status === 'Pending').length.toString(), color: '#ff8c42', sub: 'awaiting approval' },
             { label: 'Custom Requests', value: requestList.filter(r => r.status === 'Pending' || r.status === 'In Review').length.toString(), color: '#60a5fa', sub: 'in pipeline' },
@@ -354,7 +449,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-card border border-border p-5">
             <div className="text-muted-foreground uppercase mb-3" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.12em' }}>Recent Contracts</div>
             <div className="space-y-2.5">
@@ -384,7 +479,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-card border border-border p-5">
             <div className="text-muted-foreground uppercase mb-2" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.12em' }}>
               Management Modules
@@ -419,7 +514,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-coaches') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>COACH MANAGEMENT</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -430,7 +525,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
           <h2 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.06em' }}>
             Create Coach Login
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               required
               value={coachName}
@@ -505,7 +600,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-athletes') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>ATHLETE MANAGEMENT</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -519,7 +614,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
           <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.76rem' }}>
             Athlete must first create an account from the login page.
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               required
               value={athleteName}
@@ -637,7 +732,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                     </p>
                   )}
                   {entry.media.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {entry.media.map((media) => (
                         <div key={media.id} className="border border-border bg-secondary/30 p-2">
                           <div className="text-muted-foreground mb-1 truncate" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem' }}>
@@ -666,7 +761,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-exercises') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>EXERCISE LIBRARY</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -686,7 +781,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
               <h2 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.06em' }}>
                 {editingExerciseId ? "Edit Exercise" : "Add Exercise"}
               </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   required
                   value={newExerciseName}
@@ -726,7 +821,23 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                   {newExerciseMediaFile ? newExerciseMediaFile.name : editingExerciseId ? "Keep current media or upload new file" : "No file selected"}
                 </div>
               </label>
-              <div className="flex gap-2">
+              <label className="flex items-start gap-3 border border-border bg-secondary/30 p-3 cursor-pointer hover:bg-secondary/50 transition-all">
+                <input
+                  type="checkbox"
+                  checked={newExerciseRequiresWeights}
+                  onChange={(event) => setNewExerciseRequiresWeights(event.target.checked)}
+                  className="mt-0.5 accent-[#ff8c42]"
+                />
+                <div>
+                  <div className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em' }}>
+                    Requires Weights
+                  </div>
+                  <div className="text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', lineHeight: 1.45 }}>
+                    Athletes will be prompted to log the load they used before marking this exercise complete. Logging stays optional.
+                  </div>
+                </div>
+              </label>
+              <div className="flex flex-wrap gap-2">
                 <button type="submit" className="px-4 py-2 bg-[#ff8c42]/10 border border-[#ff8c42]/30 text-[#ff8c42] hover:bg-[#ff8c42]/20 transition-all cursor-pointer uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em' }}>
                   {editingExerciseId ? "Update Exercise" : "Add Exercise"}
                 </button>
@@ -742,7 +853,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
             </form>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-card border border-border p-5">
             <div className="text-foreground uppercase mb-3" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.06em' }}>
               All Exercises
@@ -753,12 +864,13 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                   key={exercise.id}
                   className={`w-full border px-3 py-2 transition-all ${selectedExerciseId === exercise.id ? "border-[#ff8c42]/40 bg-[#ff8c42]/10" : "border-border hover:border-[#ff8c42]/30"}`}
                 >
-                  <button onClick={() => setSelectedExerciseId(exercise.id)} className="w-full text-left cursor-pointer">
+                  <button onClick={() => { setSelectedExerciseId(exercise.id); setShowAssignPanel(false); }} className="w-full text-left cursor-pointer">
                     <div className="text-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>
                       {String(index + 1).padStart(2, "0")} · {exercise.name}
                     </div>
                     <div className="text-muted-foreground mt-1 truncate" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem' }}>
                       {exercise.mediaType.toUpperCase()} · {exercise.mediaName}
+                      {exercise.requiresWeights ? " · WEIGHTED" : " · BODYWEIGHT"}
                     </div>
                   </button>
                   <div className="flex gap-2 mt-2 pt-2 border-t border-border">
@@ -798,6 +910,16 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                 <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', lineHeight: 1.5 }}>
                   {selectedExercise.description}
                 </p>
+                <div
+                  className={`inline-flex px-2 py-1 border uppercase ${
+                    selectedExercise.requiresWeights
+                      ? "border-[#ff8c42]/35 text-[#ff8c42]"
+                      : "border-border text-muted-foreground"
+                  }`}
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '0.58rem', letterSpacing: '0.08em' }}
+                >
+                  {selectedExercise.requiresWeights ? "Requires Weights" : "Bodyweight / No Load"}
+                </div>
                 {selectedExercise.mediaType === "image" ? (
                   <img src={selectedExercise.mediaUrl} alt={selectedExercise.name} className="w-full h-44 object-cover border border-border" />
                 ) : (
@@ -814,6 +936,104 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                     Open Video Link
                   </a>
                 )}
+                <button
+                  type="button"
+                  onClick={() => (showAssignPanel ? setShowAssignPanel(false) : openAssignPanel())}
+                  className="w-full px-4 py-2 bg-[#ff8c42]/10 border border-[#ff8c42]/30 text-[#ff8c42] hover:bg-[#ff8c42]/20 transition-all cursor-pointer uppercase"
+                  style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em' }}
+                >
+                  {showAssignPanel ? "Close Assign" : "Assign"}
+                </button>
+                {showAssignPanel && (
+                  <div className="border border-border bg-secondary/30 p-3 space-y-3">
+                    <div className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em' }}>
+                      Assign Exercise
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAssignTarget("program")}
+                        className={`px-3 py-2 border uppercase cursor-pointer transition-all ${assignTarget === "program" ? "border-[#a78bfa]/40 bg-[#a78bfa]/10 text-[#a78bfa]" : "border-border text-muted-foreground"}`}
+                        style={{ fontFamily: 'var(--font-display)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em' }}
+                      >
+                        Program
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAssignTarget("athlete")}
+                        className={`px-3 py-2 border uppercase cursor-pointer transition-all ${assignTarget === "athlete" ? "border-[#ff8c42]/40 bg-[#ff8c42]/10 text-[#ff8c42]" : "border-border text-muted-foreground"}`}
+                        style={{ fontFamily: 'var(--font-display)', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em' }}
+                      >
+                        Athlete
+                      </button>
+                    </div>
+                    {assignTarget === "program" ? (
+                      <div>
+                        <label className="block text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.58rem', letterSpacing: '0.1em' }}>
+                          Program
+                        </label>
+                        <select
+                          value={assignProgramId}
+                          onChange={(event) => setAssignProgramId(event.target.value)}
+                          className="w-full bg-secondary border border-border px-3 py-2 text-foreground focus:outline-none"
+                          style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}
+                        >
+                          {programList.length === 0 && <option value="">No programs yet</option>}
+                          {programList.map((program) => (
+                            <option key={program.id} value={program.id}>
+                              {program.name} ({program.exerciseIds.length} exercises)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.58rem', letterSpacing: '0.1em' }}>
+                            Athlete
+                          </label>
+                          <select
+                            value={assignAthleteEmail}
+                            onChange={(event) => setAssignAthleteEmail(event.target.value)}
+                            className="w-full bg-secondary border border-border px-3 py-2 text-foreground focus:outline-none"
+                            style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}
+                          >
+                            {athletes.length === 0 && <option value="">No athletes yet</option>}
+                            {athletes.map((athlete) => (
+                              <option key={athlete.id} value={athlete.email}>
+                                {athlete.name} · {athlete.sport}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.58rem', letterSpacing: '0.1em' }}>
+                            Training Day
+                          </label>
+                          <div className="border border-border bg-card p-2">
+                            <DayPicker
+                              mode="single"
+                              selected={assignDate}
+                              onSelect={(date) => date && setAssignDate(date)}
+                              className="text-foreground"
+                            />
+                          </div>
+                          <div className="text-muted-foreground mt-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.58rem' }}>
+                            Selected: {toDateKey(assignDate)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={submitAssignment}
+                      className="w-full px-4 py-2 bg-primary text-white hover:opacity-90 transition-all cursor-pointer uppercase"
+                      style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em' }}
+                    >
+                      Confirm Assign
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -829,7 +1049,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-programs') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>PROGRAM LIBRARY</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -858,10 +1078,38 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
           <div className="text-foreground uppercase mb-3" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', letterSpacing: '0.06em' }}>
             All Programs
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {programList.map((program, index) => (
-              <div key={program} className="border border-border px-3 py-2 text-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>
-                {String(index + 1).padStart(2, "0")} · {program}
+              <div key={program.id} className="border border-border px-3 py-3 space-y-2">
+                <div className="text-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>
+                  {String(index + 1).padStart(2, "0")} · {program.name}
+                </div>
+                <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem' }}>
+                  {program.exerciseIds.length} exercise{program.exerciseIds.length === 1 ? "" : "s"}
+                </div>
+                {program.exerciseIds.length === 0 ? (
+                  <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem' }}>
+                    No exercises assigned yet. Use Assign on an exercise detail.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {program.exerciseIds.map((exerciseId) => (
+                      <div key={exerciseId} className="flex items-center justify-between gap-2 border border-border/70 px-2 py-1.5">
+                        <span className="text-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
+                          {exerciseNameById.get(exerciseId) ?? "Unknown exercise"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeExerciseFromProgram(program.id, exerciseId)}
+                          className="px-2 py-0.5 border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all cursor-pointer uppercase"
+                          style={{ fontFamily: 'var(--font-display)', fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.06em' }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -876,12 +1124,20 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
   }
 
   if (currentPage === 'admin-messages') {
-    return <AdminMessaging coaches={coaches} athletes={athletes} />;
+    return (
+      <AdminMessaging
+        currentUser={currentUser}
+        conversations={conversations}
+        onConversationsChange={onConversationsChange}
+        directory={messagingDirectory}
+        programs={programList}
+      />
+    );
   }
 
   if (currentPage === 'admin-contracts') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>CONTRACT MANAGEMENT</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -934,7 +1190,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-requests') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>CUSTOM PROGRAMS</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -963,7 +1219,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
                 </div>
                 {open && (
                   <div className="border-t border-border px-5 py-4 bg-muted space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {[
                         ['Goal', r.goal],
                         ['Level', r.level],
@@ -999,7 +1255,7 @@ export function AdminView({ currentPage, onCreateCoach, onCreateAthleteProfile, 
 
   if (currentPage === 'admin-groups') {
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>GROUP MANAGEMENT</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>

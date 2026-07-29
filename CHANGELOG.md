@@ -9,6 +9,18 @@
 - Switched Tailwind from the hanging Vite plugin to PostCSS so local `dev`/`build` can start.
 - Wired athlete Profile to the signed-in user with persistent saves; improved signup/confirm and role-free login.
 - Journal media now uploads to Supabase Storage; mock programs/messages/dashboard clearly labeled as demo.
+- Added Vercel config for Vite production deploys (SPA rewrites to `dist`).
+- Replaced AFSP logo asset and added a mobile hamburger sidebar with responsive admin grids.
+- Added admin exercise Assign flow for programs or athletes (with day picker), program exercise lists, and an athlete training calendar for daily assigned work.
+- Expanded athlete Training Calendar (week strip, upcoming days, completion tracking) and wired Programs to live admin program/exercise lists.
+- Athlete week strip is now range-selectable (week/month/3/6 months) with horizontal scroll; duplicate month calendar removed.
+- Removed the athlete Upcoming panel from the training dashboard.
+- Simplified athlete header to Training/Progress tabs; moved Today/Next into the week strip controls.
+- Week range button shows month + week-start day when viewing a week other than the current one.
+- Upgraded messaging to a shared role-aware store (accept/decline, New Message, coach inbox, mobile list/detail) while keeping the current chat UI goals.
+- Fixed group chat sync so messages persist immediately and appear for all roles viewing the same Global/Program thread.
+- Added **Requires Weights** on exercise create/edit; athletes can optionally log lbs/kg before marking weighted work complete (suggested, not required).
+- Tightened phone/laptop layout padding and grids across coach, programs, journal, and profile views.
 
 ## 2026-06-12
 

@@ -1,129 +1,164 @@
 // IMPORTANT: Before modifying this file, please update CHANGELOG.md with a summary of your changes.
-import { useState } from "react";
-import { Search, Filter, Star, Clock, Users, ChevronRight, Check, X, CreditCard, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, Filter, Star, Clock, Users, ChevronRight, Check, X, CreditCard, Dumbbell } from "lucide-react";
+import type { ExerciseItem, ProgramItem } from "../../../lib/training";
 
-const programs = [
+const catalogMeta = [
   {
-    id: 1,
-    name: 'Elite Strength',
-    coach: 'Marcus Webb',
-    coachAvatar: 'MW',
-    duration: '12 weeks',
+    name: "Elite Strength",
+    coach: "Marcus Webb",
+    coachAvatar: "MW",
+    duration: "12 weeks",
     price: 149,
-    type: ['In-Person', 'Virtual'],
-    level: 'Advanced',
-    category: 'Strength',
+    type: ["In-Person", "Virtual"],
+    level: "Advanced",
+    category: "Strength",
     athletes: 24,
     rating: 4.9,
     reviews: 47,
-    description: 'Periodized strength program focused on powerlifting fundamentals. Includes progressive overload protocols, technique refinement, and competition prep phases.',
-    includes: ['Daily programming', 'Weekly video check-ins', 'Form review', 'Nutrition guidelines'],
-    color: '#ff5500',
+    description:
+      "Periodized strength program focused on powerlifting fundamentals. Includes progressive overload protocols, technique refinement, and competition prep phases.",
+    includes: ["Daily programming", "Weekly video check-ins", "Form review", "Nutrition guidelines"],
+    color: "#ff5500",
   },
   {
-    id: 2,
-    name: 'Sprint Mechanics',
-    coach: 'Aisha Kim',
-    coachAvatar: 'AK',
-    duration: '8 weeks',
+    name: "Sprint Mechanics",
+    coach: "Aisha Kim",
+    coachAvatar: "AK",
+    duration: "8 weeks",
     price: 99,
-    type: ['In-Person', 'Hybrid'],
-    level: 'Intermediate',
-    category: 'Speed',
+    type: ["In-Person", "Hybrid"],
+    level: "Intermediate",
+    category: "Speed",
     athletes: 18,
     rating: 4.8,
     reviews: 31,
-    description: 'Track-based speed development focusing on acceleration mechanics, max velocity, and speed-endurance. Ideal for team sport athletes.',
-    includes: ['3x/week track sessions', 'Strength supplement work', 'Video analysis', 'Recovery protocols'],
-    color: '#60a5fa',
+    description:
+      "Track-based speed development focusing on acceleration mechanics, max velocity, and speed-endurance. Ideal for team sport athletes.",
+    includes: ["3x/week track sessions", "Strength supplement work", "Video analysis", "Recovery protocols"],
+    color: "#60a5fa",
   },
   {
-    id: 3,
-    name: 'Recovery & Mobility',
-    coach: 'James Ortega',
-    coachAvatar: 'JO',
-    duration: '6 weeks',
+    name: "Recovery & Mobility",
+    coach: "James Ortega",
+    coachAvatar: "JO",
+    duration: "6 weeks",
     price: 79,
-    type: ['Virtual'],
-    level: 'All Levels',
-    category: 'Recovery',
+    type: ["Virtual"],
+    level: "All Levels",
+    category: "Recovery",
     athletes: 52,
     rating: 4.7,
     reviews: 89,
-    description: 'Comprehensive mobility and injury prevention program. Combines yoga, corrective exercise, and soft tissue work for sustained performance.',
-    includes: ['Daily mobility sessions', 'Self-myofascial release', 'Breath work', 'Sleep protocols'],
-    color: '#4ade80',
-  },
-  {
-    id: 4,
-    name: 'Olympic Lifting',
-    coach: 'Priya Sharma',
-    coachAvatar: 'PS',
-    duration: '16 weeks',
-    price: 179,
-    type: ['In-Person', 'Virtual', 'Hybrid'],
-    level: 'Beginner-Advanced',
-    category: 'Olympic Lifting',
-    athletes: 12,
-    rating: 4.9,
-    reviews: 22,
-    description: 'Full Olympic weightlifting program covering snatch, clean & jerk, and accessory work. Technique-first approach with competition pathway.',
-    includes: ['4x/week training', 'Technique breakdowns', '1-on-1 monthly review', 'Competition prep'],
-    color: '#a78bfa',
-  },
-  {
-    id: 5,
-    name: 'Field Conditioning',
-    coach: 'Devon Brooks',
-    coachAvatar: 'DB',
-    duration: '10 weeks',
-    price: 119,
-    type: ['In-Person', 'Hybrid'],
-    level: 'Intermediate',
-    category: 'Conditioning',
-    athletes: 36,
-    rating: 4.6,
-    reviews: 58,
-    description: 'Sport-specific conditioning for field sport athletes. Focuses on repeated sprint ability, agility, and game-ready fitness.',
-    includes: ['5x/week sessions', 'GPS tracking', 'Load monitoring', 'Position-specific drills'],
-    color: '#ff8c42',
+    description:
+      "Comprehensive mobility and injury prevention program. Combines yoga, corrective exercise, and soft tissue work for sustained performance.",
+    includes: ["Daily mobility sessions", "Self-myofascial release", "Breath work", "Sleep protocols"],
+    color: "#4ade80",
   },
 ];
 
-type ModalState = 'details' | 'enroll' | 'payment' | 'success' | null;
+const fallbackColors = ["#ff5500", "#60a5fa", "#4ade80", "#a78bfa", "#ff8c42"];
+
+type ModalState = "details" | "enroll" | "payment" | "success" | null;
+
+interface CatalogProgram {
+  id: string;
+  name: string;
+  coach: string;
+  coachAvatar: string;
+  duration: string;
+  price: number;
+  type: string[];
+  level: string;
+  category: string;
+  athletes: number;
+  rating: number;
+  reviews: number;
+  description: string;
+  includes: string[];
+  color: string;
+  exerciseIds: string[];
+}
 
 interface ProgramMarketplaceProps {
   onGoToDashboard?: () => void;
+  programs: ProgramItem[];
+  exercises: ExerciseItem[];
 }
 
-export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps) {
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('All');
-  const [filterLevel, setFilterLevel] = useState('All');
-  const [selected, setSelected] = useState<typeof programs[0] | null>(null);
+export function ProgramMarketplace({ onGoToDashboard, programs, exercises }: ProgramMarketplaceProps) {
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("All");
+  const [selected, setSelected] = useState<CatalogProgram | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
-  const [enrollType, setEnrollType] = useState('Virtual');
+  const [enrollType, setEnrollType] = useState("Virtual");
   const [duration, setDuration] = useState(1);
-  const [cardNumber, setCardNumber] = useState('');
   const [customMode, setCustomMode] = useState(false);
 
-  const filtered = programs.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.coach.toLowerCase().includes(search.toLowerCase());
-    const matchType = filterType === 'All' || p.type.includes(filterType);
-    const matchLevel = filterLevel === 'All' || p.level.includes(filterLevel);
-    return matchSearch && matchType && matchLevel;
+  const exerciseById = useMemo(() => {
+    const map = new Map<string, ExerciseItem>();
+    exercises.forEach((exercise) => map.set(exercise.id, exercise));
+    return map;
+  }, [exercises]);
+
+  const catalog = useMemo<CatalogProgram[]>(() => {
+    return programs.map((program, index) => {
+      const meta = catalogMeta.find((item) => item.name.toLowerCase() === program.name.toLowerCase());
+      const color = meta?.color ?? fallbackColors[index % fallbackColors.length];
+      return {
+        id: program.id,
+        name: program.name,
+        coach: meta?.coach ?? "AFSP Coaching",
+        coachAvatar: meta?.coachAvatar ?? "AF",
+        duration: meta?.duration ?? "Custom",
+        price: meta?.price ?? 99,
+        type: meta?.type ?? ["Virtual"],
+        level: meta?.level ?? "All Levels",
+        category: meta?.category ?? "Program",
+        athletes: meta?.athletes ?? 0,
+        rating: meta?.rating ?? 5,
+        reviews: meta?.reviews ?? 0,
+        description:
+          meta?.description ??
+          `${program.name} program with ${program.exerciseIds.length} exercise${program.exerciseIds.length === 1 ? "" : "s"} assigned by administration.`,
+        includes: meta?.includes ?? ["Admin-managed exercise library", "Calendar day assignments", "Progress tracking"],
+        color,
+        exerciseIds: program.exerciseIds,
+      };
+    });
+  }, [programs]);
+
+  const filtered = catalog.filter((program) => {
+    const matchSearch =
+      program.name.toLowerCase().includes(search.toLowerCase()) ||
+      program.coach.toLowerCase().includes(search.toLowerCase());
+    const matchType = filterType === "All" || program.type.includes(filterType);
+    return matchSearch && matchType;
   });
 
-  const openProgram = (p: typeof programs[0]) => { setSelected(p); setModal('details'); };
-  const closeModal = () => { setModal(null); setSelected(null); };
+  const selectedExercises = selected
+    ? selected.exerciseIds
+        .map((id) => exerciseById.get(id))
+        .filter((exercise): exercise is ExerciseItem => Boolean(exercise))
+    : [];
+
+  const openProgram = (program: CatalogProgram) => {
+    setSelected(program);
+    setEnrollType(program.type[0] ?? "Virtual");
+    setModal("details");
+  };
+  const closeModal = () => {
+    setModal(null);
+    setSelected(null);
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="mb-4 border border-[#ff8c42]/40 bg-[#ff8c42]/10 px-3 py-2 text-[#ff8c42]" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem' }}>
-        Program catalog is demo content. Enrollment does not charge cards or create live contracts yet.
+        Programs and their exercise lists come from the admin library. Enrollment checkout is still demo-only.
       </div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div>
           <div className="text-muted-foreground uppercase mb-1" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.12em' }}>PROGRAM CATALOG</div>
           <h1 className="text-foreground uppercase" style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800, lineHeight: 1, letterSpacing: '0.04em' }}>
@@ -140,7 +175,7 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
         <div className="flex-1 relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -151,10 +186,10 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
             style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem' }}
           />
         </div>
-        <div className="flex items-center gap-2 border border-border px-3 bg-secondary">
-          <Filter size={14} className="text-muted-foreground" />
+        <div className="flex items-center gap-2 border border-border px-3 bg-secondary overflow-x-auto">
+          <Filter size={14} className="text-muted-foreground flex-shrink-0" />
           {['All', 'Virtual', 'In-Person', 'Hybrid'].map(t => (
-            <button key={t} onClick={() => setFilterType(t)} className={`px-2.5 py-1 cursor-pointer transition-all ${filterType === t ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.04em' }}>
+            <button key={t} onClick={() => setFilterType(t)} className={`px-2.5 py-1 cursor-pointer transition-all whitespace-nowrap ${filterType === t ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.04em' }}>
               {t}
             </button>
           ))}
@@ -162,7 +197,12 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
       </div>
 
       {/* Program grid */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xl:grid-cols-3">
+        {filtered.length === 0 && (
+          <div className="col-span-full bg-card border border-border p-5 text-muted-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem' }}>
+            No programs available yet. An admin can create programs and assign exercises to them.
+          </div>
+        )}
         {filtered.map(p => (
           <div key={p.id} className="bg-card border border-border hover:border-[rgba(255,255,255,0.18)] transition-all cursor-pointer group" onClick={() => openProgram(p)}>
             <div className="h-1.5" style={{ background: p.color }} />
@@ -188,6 +228,10 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
               <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)', fontSize: '0.78rem', lineHeight: 1.55 }}>{p.description.slice(0, 90)}...</p>
 
               <div className="flex items-center gap-4 border-t border-border pt-3 mt-3">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Dumbbell size={12} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>{p.exerciseIds.length} exercises</span>
+                </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Clock size={12} />
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem' }}>{p.duration}</span>
@@ -272,6 +316,27 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
                 ))}
               </div>
               <div>
+                <div className="text-foreground uppercase mb-2" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.06em' }}>Exercise List</div>
+                {selectedExercises.length === 0 ? (
+                  <div className="text-muted-foreground border border-border px-3 py-2" style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem' }}>
+                    No exercises assigned to this program yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {selectedExercises.map((exercise, index) => (
+                      <div key={exercise.id} className="border border-border px-3 py-2">
+                        <div className="text-foreground" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>
+                          {String(index + 1).padStart(2, "0")} · {exercise.name}
+                        </div>
+                        <div className="text-muted-foreground mt-0.5" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem' }}>
+                          {exercise.description}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
                 <div className="text-foreground uppercase mb-2" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.06em' }}>What's Included</div>
                 <div className="space-y-1.5">
                   {selected.includes.map(inc => (
@@ -336,7 +401,7 @@ export function ProgramMarketplace({ onGoToDashboard }: ProgramMarketplaceProps)
               ].map(f => (
                 <div key={f.label}>
                   <label className="block text-muted-foreground mb-1.5 uppercase" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.1em' }}>{f.label}</label>
-                  <input placeholder={f.placeholder} type={f.type} className="w-full bg-secondary border border-border px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }} onChange={f.label === 'Card Number' ? e => setCardNumber(e.target.value) : undefined} />
+                  <input placeholder={f.placeholder} type={f.type} className="w-full bg-secondary border border-border px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50" style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem' }} />
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-3">
