@@ -1,5 +1,5 @@
 // IMPORTANT: Before modifying this file, please update CHANGELOG.md with a summary of your changes.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { AthleteDashboard } from "./components/athlete/AthleteDashboard";
 import { ProgramMarketplace } from "./components/athlete/ProgramMarketplace";
@@ -29,6 +29,21 @@ import {
   uploadJournalMediaFiles,
   type AuthResult,
 } from "../lib/api";
+import {
+  loadTrainingState,
+  saveTrainingState,
+  type AthleteExerciseAssignment,
+  type ExerciseItem,
+  type ProgramItem,
+} from "../lib/training";
+import {
+  ensureProgramGroups,
+  loadMessagingState,
+  saveMessagingState,
+  syncSharedGroupMembers,
+  type Conversation,
+  type MessagingUser,
+} from "../lib/messaging";
 
 interface CreateJournalResult {
   success: boolean;
@@ -50,6 +65,109 @@ export default function App() {
   const [page, setPage] = useState<string>("dashboard");
   const [bootstrapping, setBootstrapping] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [exerciseList, setExerciseList] = useState<ExerciseItem[]>(() => loadTrainingState().exercises);
+  const [programList, setProgramList] = useState<ProgramItem[]>(() => loadTrainingState().programs);
+  const [assignments, setAssignments] = useState<AthleteExerciseAssignment[]>(() => loadTrainingState().assignments);
+  const [conversations, setConversations] = useState<Conversation[]>(() => loadMessagingState().conversations);
+
+  const commitConversations = useCallback(
+    (updater: Conversation[] | ((previous: Conversation[]) => Conversation[])) => {
+      setConversations((previous) => {
+        const next = typeof updater === "function" ? updater(previous) : updater;
+        saveMessagingState({ conversations: next });
+        return next;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    saveTrainingState({ exercises: exerciseList, programs: programList, assignments });
+  }, [exerciseList, programList, assignments]);
+
+  // Keep tabs/windows in sync when another session writes messaging state.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "afsp-messaging-v1" || !event.newValue) return;
+      try {
+        const parsed = JSON.parse(event.newValue) as { conversations?: Conversation[] };
+        if (Array.isArray(parsed.conversations)) {
+          setConversations(parsed.conversations);
+        }
+      } catch {
+        // ignore malformed storage payloads
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Reload shared threads whenever the signed-in account changes.
+  useEffect(() => {
+    if (!activeUser) return;
+    setConversations(loadMessagingState().conversations);
+  }, [activeUser?.id]);
+
+  const messagingDirectory = useMemo<MessagingUser[]>(() => {
+    const users: MessagingUser[] = [
+      ...coaches.map((coach) => ({
+        id: coach.id,
+        name: coach.name,
+        email: coach.email,
+        role: "coach" as const,
+      })),
+      ...athletes.map((athlete) => ({
+        id: athlete.id,
+        name: athlete.name,
+        email: athlete.email,
+        role: "athlete" as const,
+      })),
+    ];
+    if (activeUser?.role === "admin") {
+      users.unshift({
+        id: activeUser.id,
+        name: activeUser.name,
+        email: activeUser.email,
+        role: "admin",
+      });
+    } else if (activeUser) {
+      users.push({
+        id: "admin-platform",
+        name: "Platform Admin",
+        email: "admin@afsp.com",
+        role: "admin",
+      });
+      if (!users.some((user) => user.email.toLowerCase() === activeUser.email.toLowerCase())) {
+        users.push({
+          id: activeUser.id,
+          name: activeUser.name,
+          email: activeUser.email,
+          role: activeUser.role,
+        });
+      }
+    }
+    const byEmail = new Map<string, MessagingUser>();
+    users.forEach((user) => byEmail.set(user.email.toLowerCase(), user));
+    return [...byEmail.values()];
+  }, [activeUser, athletes, coaches]);
+
+  useEffect(() => {
+    const memberEmails = Array.from(
+      new Set([
+        "admin@afsp.com",
+        "marcus@afsp.com",
+        "jordan@afsp.com",
+        ...coaches.map((coach) => coach.email.toLowerCase()),
+        ...athletes.map((athlete) => athlete.email.toLowerCase()),
+        ...(activeUser ? [activeUser.email.toLowerCase()] : []),
+      ])
+    );
+    commitConversations((previous) => {
+      const withPrograms = ensureProgramGroups(previous, programList, memberEmails);
+      const withMembers = syncSharedGroupMembers(withPrograms, memberEmails);
+      return withMembers;
+    });
+  }, [activeUser, athletes, coaches, commitConversations, programList]);
 
   const refreshDirectory = useCallback(async (forEmail?: string) => {
     const [athleteRows, coachRows, journalRows] = await Promise.all([
@@ -241,9 +359,62 @@ export default function App() {
   const renderContent = () => {
     if (role === "athlete") {
       if (!activeUser) return null;
-      if (page === "dashboard") return <AthleteDashboard athleteName={activeUser.name} />;
-      if (page === "programs") return <ProgramMarketplace onGoToDashboard={() => setPage("dashboard")} />;
-      if (page === "messages") return <Messaging />;
+      if (page === "dashboard") {
+        return (
+          <AthleteDashboard
+            athleteName={activeUser.name}
+            athleteEmail={activeUser.email}
+            exercises={exerciseList}
+            assignments={assignments.filter(
+              (item) => item.athleteEmail.toLowerCase() === activeUser.email.toLowerCase()
+            )}
+            onToggleAssignmentComplete={(assignmentId) => {
+              setAssignments((previous) =>
+                previous.map((item) =>
+                  item.id === assignmentId ? { ...item, completed: !item.completed } : item
+                )
+              );
+            }}
+            onUpdateAssignmentWeight={(assignmentId, loggedWeight, weightUnit) => {
+              setAssignments((previous) =>
+                previous.map((item) =>
+                  item.id === assignmentId
+                    ? {
+                        ...item,
+                        loggedWeight: loggedWeight.trim() ? loggedWeight.trim() : undefined,
+                        weightUnit,
+                      }
+                    : item
+                )
+              );
+            }}
+          />
+        );
+      }
+      if (page === "programs") {
+        return (
+          <ProgramMarketplace
+            onGoToDashboard={() => setPage("dashboard")}
+            programs={programList}
+            exercises={exerciseList}
+          />
+        );
+      }
+      if (page === "messages") {
+        return (
+          <Messaging
+            currentUser={{
+              id: activeUser.id,
+              name: activeUser.name,
+              email: activeUser.email,
+              role: "athlete",
+            }}
+            conversations={conversations}
+            onConversationsChange={commitConversations}
+            directory={messagingDirectory}
+          />
+        );
+      }
       if (page === "journal") {
         return (
           <AthleteJournal
@@ -270,9 +441,25 @@ export default function App() {
       }
     }
     if (role === "coach") {
-      return <CoachView currentPage={page} onNavigate={setPage} />;
+      if (!activeUser) return null;
+      return (
+        <CoachView
+          currentPage={page}
+          onNavigate={setPage}
+          currentUser={{
+            id: activeUser.id,
+            name: activeUser.name,
+            email: activeUser.email,
+            role: "coach",
+          }}
+          conversations={conversations}
+          onConversationsChange={commitConversations}
+          messagingDirectory={messagingDirectory}
+        />
+      );
     }
     if (role === "admin") {
+      if (!activeUser) return null;
       return (
         <AdminView
           currentPage={page}
@@ -291,6 +478,21 @@ export default function App() {
             email: coach.email,
           }))}
           journalEntries={journalEntries}
+          exerciseList={exerciseList}
+          programList={programList}
+          assignments={assignments}
+          onExercisesChange={setExerciseList}
+          onProgramsChange={setProgramList}
+          onAssignmentsChange={setAssignments}
+          currentUser={{
+            id: activeUser.id,
+            name: activeUser.name,
+            email: activeUser.email,
+            role: "admin",
+          }}
+          conversations={conversations}
+          onConversationsChange={commitConversations}
+          messagingDirectory={messagingDirectory}
         />
       );
     }
@@ -319,7 +521,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex flex-col md:flex-row h-dvh w-full overflow-hidden bg-background">
       <Sidebar
         role={role}
         currentPage={page}
@@ -327,7 +529,7 @@ export default function App() {
         onLogout={handleLogout}
         currentUserName={activeUser.name}
       />
-      <main className="flex-1 flex flex-col overflow-hidden">{renderContent()}</main>
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">{renderContent()}</main>
     </div>
   );
 }

@@ -90,8 +90,8 @@ export function LoginPage({ onLogin, onAthleteSignUp }: LoginPageProps) {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-card border border-border p-6 space-y-5">
         <div>
-          <div className="mb-4 border border-border bg-secondary/40 p-3">
-            <img src={afspLogo} alt="Authentikos Athletix Club" className="w-full h-auto object-contain" />
+          <div className="mb-4 border border-border bg-white p-3">
+            <img src={afspLogo} alt="Authentic Fitness & Sports Performance" className="w-full h-auto object-contain" />
           </div>
           <div
             className="text-muted-foreground uppercase mb-1"

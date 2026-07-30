@@ -152,14 +152,14 @@ export function AthleteProfile({ user, onProfileUpdated }: AthleteProfileProps) 
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto p-6 text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>
         Loading profile...
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <div
@@ -223,13 +223,13 @@ export function AthleteProfile({ user, onProfileUpdated }: AthleteProfileProps) 
         >
           Biometrics
         </h3>
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 xl:grid-cols-4">
           {field("Age", "age")}
           {field("Height", "height")}
           {field("Weight", "weight")}
           {field("Body Fat", "bodyFat")}
         </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           {field("Sport / Discipline", "sport")}
           {field("Division / Category", "position")}
         </div>
@@ -242,7 +242,7 @@ export function AthleteProfile({ user, onProfileUpdated }: AthleteProfileProps) 
         >
           Contact
         </h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {field("Full Name", "name")}
           {field("Email", "email")}
           {field("Phone", "phone")}
