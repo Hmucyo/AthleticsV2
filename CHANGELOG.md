@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-04
+
+- Added athlete workout reminder pop-ups: morning “You have x pending exercises today” and evening “You still have x pending exercises”, using today’s incomplete assignments.
+- Added a Notifications module below Profile so athletes can reopen those reminders after the pop-up times out.
+
 ## 2026-07-18
 
 - Replaced mock in-memory auth with Supabase Auth (email/password) and persisted sessions.

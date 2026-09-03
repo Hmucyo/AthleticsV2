@@ -5,7 +5,10 @@ import { AthleteDashboard } from "./components/athlete/AthleteDashboard";
 import { ProgramMarketplace } from "./components/athlete/ProgramMarketplace";
 import { Messaging } from "./components/athlete/Messaging";
 import { AthleteProfile } from "./components/athlete/AthleteProfile";
+import { AthleteNotifications } from "./components/athlete/AthleteNotifications";
+import { WorkoutReminderToast } from "./components/athlete/WorkoutReminderToast";
 import { AthleteJournal, type JournalEntry, type JournalMedia } from "./components/athlete/AthleteJournal";
+import { useWorkoutReminders } from "./hooks/useWorkoutReminders";
 import { CoachView } from "./components/coach/CoachView";
 import { AdminView } from "./components/admin/AdminView";
 import { LoginPage } from "./components/auth/LoginPage";
@@ -69,6 +72,14 @@ export default function App() {
   const [programList, setProgramList] = useState<ProgramItem[]>(() => loadTrainingState().programs);
   const [assignments, setAssignments] = useState<AthleteExerciseAssignment[]>(() => loadTrainingState().assignments);
   const [conversations, setConversations] = useState<Conversation[]>(() => loadMessagingState().conversations);
+  const athleteEmail = role === "athlete" && activeUser ? activeUser.email : null;
+  const {
+    notifications,
+    unreadCount: notificationUnreadCount,
+    toast: workoutToast,
+    dismissToast,
+    markAllRead,
+  } = useWorkoutReminders(athleteEmail, assignments);
 
   const commitConversations = useCallback(
     (updater: Conversation[] | ((previous: Conversation[]) => Conversation[])) => {
@@ -84,6 +95,10 @@ export default function App() {
   useEffect(() => {
     saveTrainingState({ exercises: exerciseList, programs: programList, assignments });
   }, [exerciseList, programList, assignments]);
+
+  useEffect(() => {
+    if (page === "notifications") dismissToast();
+  }, [page, dismissToast]);
 
   // Keep tabs/windows in sync when another session writes messaging state.
   useEffect(() => {
@@ -439,6 +454,15 @@ export default function App() {
           />
         );
       }
+      if (page === "notifications") {
+        return (
+          <AthleteNotifications
+            notifications={notifications}
+            onMarkAllRead={markAllRead}
+            onOpenTraining={() => setPage("dashboard")}
+          />
+        );
+      }
     }
     if (role === "coach") {
       if (!activeUser) return null;
@@ -528,8 +552,19 @@ export default function App() {
         onNavigate={setPage}
         onLogout={handleLogout}
         currentUserName={activeUser.name}
+        notificationUnreadCount={role === "athlete" ? notificationUnreadCount : 0}
       />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">{renderContent()}</main>
+      {role === "athlete" && workoutToast && (
+        <WorkoutReminderToast
+          notification={workoutToast}
+          onDismiss={dismissToast}
+          onOpen={() => {
+            dismissToast();
+            setPage("notifications");
+          }}
+        />
+      )}
     </div>
   );
 }
