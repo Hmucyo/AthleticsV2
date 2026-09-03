@@ -1,6 +1,6 @@
 // IMPORTANT: Before modifying this file, please update CHANGELOG.md with a summary of your changes.
 import { useState } from "react";
-import { Dumbbell, LayoutDashboard, MessageSquare, Calendar, Users, FileText, ClipboardList, ShieldCheck, ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { Dumbbell, LayoutDashboard, MessageSquare, Calendar, Users, FileText, ClipboardList, ShieldCheck, ChevronRight, LogOut, Menu, X, Bell } from "lucide-react";
 import afspLogo from "../../assets/afsp-logo.png";
 import { useIsMobile } from "./ui/use-mobile";
 
@@ -19,6 +19,7 @@ const athleteNav: NavItem[] = [
   { id: "messages", label: "Messages", icon: <MessageSquare size={18} /> },
   { id: "journal", label: "Journal", icon: <ClipboardList size={18} /> },
   { id: "profile", label: "Profile", icon: <Users size={18} /> },
+  { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
 ];
 
 const coachNav: NavItem[] = [
@@ -46,6 +47,7 @@ interface SidebarProps {
   onNavigate: (page: Page) => void;
   onLogout: () => void | Promise<void>;
   currentUserName: string;
+  notificationUnreadCount?: number;
 }
 
 const roleLabels: Record<Role, string> = {
@@ -60,7 +62,7 @@ const roleColors: Record<Role, string> = {
   admin: "text-[#a78bfa]",
 };
 
-export function Sidebar({ role, currentPage, onNavigate, onLogout, currentUserName }: SidebarProps) {
+export function Sidebar({ role, currentPage, onNavigate, onLogout, currentUserName, notificationUnreadCount = 0 }: SidebarProps) {
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = role === "athlete" ? athleteNav : role === "coach" ? coachNav : adminNav;
@@ -126,7 +128,16 @@ export function Sidebar({ role, currentPage, onNavigate, onLogout, currentUserNa
               <span style={{ fontFamily: "var(--font-display)", fontSize: "0.95rem", fontWeight: active ? 700 : 600, letterSpacing: "0.04em" }}>
                 {item.label}
               </span>
-              {active && <ChevronRight size={14} className="ml-auto text-primary" />}
+              {item.id === "notifications" && notificationUnreadCount > 0 ? (
+                <span
+                  className="ml-auto min-w-5 h-5 px-1.5 bg-primary text-white flex items-center justify-center"
+                  style={{ fontFamily: "var(--font-display)", fontSize: "0.65rem", fontWeight: 800 }}
+                >
+                  {notificationUnreadCount > 9 ? "9+" : notificationUnreadCount}
+                </span>
+              ) : (
+                active && <ChevronRight size={14} className="ml-auto text-primary" />
+              )}
             </button>
           );
         })}
