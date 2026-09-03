@@ -3,13 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   countPendingForDate,
   getAppNow,
-  getReminderSlot,
+  getReminderContext,
   hasShownReminder,
   markAthleteNotificationsRead,
   notificationsForAthlete,
   recordReminder,
   TOAST_DURATION_MS,
-  toDateKey,
   type AthleteNotification,
 } from "../../lib/notifications";
 import type { AthleteExerciseAssignment } from "../../lib/training";
@@ -39,10 +38,10 @@ export function useWorkoutReminders(
   const tryFireCurrentSlot = useCallback(() => {
     if (!athleteEmail) return;
     const now = getAppNow();
-    const slot = getReminderSlot(now);
-    if (!slot) return;
+    const context = getReminderContext(now);
+    if (!context) return;
 
-    const dateKey = toDateKey(now);
+    const { slot, dateKey } = context;
     if (hasShownReminder(athleteEmail, dateKey, slot)) return;
 
     const pendingCount = countPendingForDate(assignments, athleteEmail, dateKey);

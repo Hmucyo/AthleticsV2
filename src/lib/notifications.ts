@@ -37,9 +37,22 @@ export function getAppNow(): Date {
 }
 
 export function getReminderSlot(now: Date = getAppNow()): ReminderSlot | null {
+  return getReminderContext(now)?.slot ?? null;
+}
+
+export function getReminderContext(now: Date = getAppNow()): { slot: ReminderSlot; dateKey: string } | null {
   const hour = now.getHours();
-  if (hour >= MORNING_START_HOUR && hour < MORNING_END_HOUR) return "morning";
-  if (hour >= EVENING_START_HOUR) return "evening";
+  if (hour >= MORNING_START_HOUR && hour < MORNING_END_HOUR) {
+    return { slot: "morning", dateKey: toDateKey(now) };
+  }
+  if (hour >= EVENING_START_HOUR) {
+    return { slot: "evening", dateKey: toDateKey(now) };
+  }
+  if (hour < MORNING_START_HOUR) {
+    const previous = new Date(now);
+    previous.setDate(previous.getDate() - 1);
+    return { slot: "evening", dateKey: toDateKey(previous) };
+  }
   return null;
 }
 
